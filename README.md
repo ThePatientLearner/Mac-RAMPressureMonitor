@@ -1,4 +1,4 @@
-# RAMonitor
+# Mac-RAMPressureMonitor
 
 A tiny macOS menu bar app that shows **memory pressure** and **CPU usage** as live
 percentages, colour-coded green → orange → red.
@@ -21,7 +21,7 @@ your Mac is struggling:
 pressure = (wired pages + compressed pages) / total pages
 ```
 
-Those are the pages the kernel *cannot* hand back to you on demand. RAMonitor uses
+Those are the pages the kernel *cannot* hand back to you on demand. This app uses
 the same formula, and additionally reads `kern.memorystatus_vm_pressure_level` so it
 can go orange or red the moment the kernel itself reports pressure, even if the
 percentage has not crossed the threshold yet.
@@ -51,11 +51,11 @@ right on a threshold.
 ## Build and install
 
 ```bash
-git clone https://github.com/ThePatientLearner/RAMonitor.git
-cd RAMonitor
+git clone https://github.com/ThePatientLearner/Mac-RAMPressureMonitor.git
+cd Mac-RAMPressureMonitor
 ./build.sh
-cp -R build/RAMonitor.app ~/Applications/
-open ~/Applications/RAMonitor.app
+cp -R build/RAMPressureMonitor.app ~/Applications/
+open ~/Applications/RAMPressureMonitor.app
 ```
 
 `build.sh` compiles the sources with `swiftc`, assembles the `.app` bundle by hand

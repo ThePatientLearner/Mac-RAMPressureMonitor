@@ -5,13 +5,15 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>es</string>
 	<key>CFBundleExecutable</key>
-	<string>RAMonitor</string>
+	<string>RAMPressureMonitor</string>
 	<key>CFBundleIdentifier</key>
-	<string>io.github.thepatientlearner.ramonitor</string>
+	<string>io.github.thepatientlearner.rampressuremonitor</string>
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
+	<key>CFBundleDisplayName</key>
+	<string>RAM Pressure Monitor</string>
 	<key>CFBundleName</key>
-	<string>RAMonitor</string>
+	<string>RAM Pressure Monitor</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
