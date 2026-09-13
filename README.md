@@ -45,6 +45,7 @@ right on a threshold.
 
 ## Requirements
 
+- **Apple Silicon Mac** (M1 or later) — the build is arm64-only and will not run on Intel
 - macOS 13 or later
 - Xcode Command Line Tools (`xcode-select --install`) — **full Xcode is not needed**
 
@@ -62,9 +63,31 @@ open ~/Applications/RAMPressureMonitor.app
 and ad-hoc signs it. There is no `.xcodeproj` — an app bundle is just a directory
 with an `Info.plist` and a binary in `Contents/MacOS/`.
 
-Because the app is ad-hoc signed rather than signed with an Apple Developer
-certificate, Gatekeeper may ask you to confirm the first launch. Right-click the app
-and choose *Open* if macOS refuses the double-click.
+Building it yourself is the recommended route: a binary you compile locally is never
+quarantined, so it just opens.
+
+## Sharing the built app with someone else
+
+The app is ad-hoc signed, not signed with an Apple Developer certificate and not
+notarised. If you zip `RAMPressureMonitor.app` and send it to someone, macOS flags the
+download as quarantined and refuses the first launch outright.
+
+On macOS 15 (Sequoia) and later, the old Control-click → *Open* trick no longer works.
+The recipient has to:
+
+1. Double-click the app and dismiss the warning
+2. Open **System Settings → Privacy & Security**
+3. Scroll to the Security section, where an **Open Anyway** button has appeared
+4. Click it, authenticate, and confirm on the next launch
+
+Alternatively, from Terminal:
+
+```bash
+xattr -dr com.apple.quarantine /path/to/RAMPressureMonitor.app
+```
+
+Both are one-time steps. The friction disappears entirely if the recipient clones this
+repository and runs `./build.sh` themselves.
 
 ## Menu
 
