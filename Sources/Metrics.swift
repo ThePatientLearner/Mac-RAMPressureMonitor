@@ -132,6 +132,36 @@ enum MemoryReader {
     }
 }
 
+// MARK: - Almacenamiento
+
+struct DiskSample {
+    var availableBytes: Int64
+    var totalBytes: Int64
+    var freeFraction: Double  // 0...1
+}
+
+enum DiskReader {
+    /// Lee el volumen de arranque. Se usa `forImportantUsage` porque es la cifra
+    /// que enseña el Finder: cuenta como disponible lo que macOS puede purgar,
+    /// así que coincide con lo que el usuario ve en "Acerca de este Mac".
+    static func read() -> DiskSample? {
+        let url = URL(fileURLWithPath: "/")
+        let keys: Set<URLResourceKey> = [
+            .volumeAvailableCapacityForImportantUsageKey,
+            .volumeTotalCapacityKey,
+        ]
+        guard let values = try? url.resourceValues(forKeys: keys),
+              let available = values.volumeAvailableCapacityForImportantUsage,
+              let total = values.volumeTotalCapacity, total > 0
+        else { return nil }
+
+        return DiskSample(
+            availableBytes: available,
+            totalBytes: Int64(total),
+            freeFraction: Double(available) / Double(total))
+    }
+}
+
 // MARK: - CPU
 
 struct CPUSample {

@@ -25,12 +25,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     // Umbrales del plan, con 3 puntos de histéresis.
     private var ramLevel = LevelTracker(warnAt: 0.60, critAt: 0.80, margin: 0.03)
     private var cpuLevel = LevelTracker(warnAt: 0.60, critAt: 0.85, margin: 0.03)
-    // Se alimenta con la fracción ocupada (1 - libre), así el verde es mucha
-    // memoria libre y el rojo poca, con los mismos umbrales que la presión.
-    private var freeLevel = LevelTracker(warnAt: 0.60, critAt: 0.80, margin: 0.03)
+    // Se alimenta con la fracción ocupada del SSD (1 - libre), así el verde es
+    // mucho espacio libre y el rojo quedarse sin sitio.
+    private var diskLevel = LevelTracker(warnAt: 0.80, critAt: 0.90, margin: 0.02)
 
     private var memory: MemorySample?
     private var cpu: CPUSample?
+    private var disk: DiskSample?
 
     private let byteFormatter: ByteCountFormatter = {
         let f = ByteCountFormatter()
@@ -80,6 +81,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     private func tick() {
         memory = MemoryReader.read()
+        disk = DiskReader.read()
         if let sample = cpuReader.read() { cpu = sample }
         render()
     }
@@ -98,11 +100,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             text.append(label("--%"))
         }
         text.append(label("  Libre "))
-        if let memory {
-            let level = freeLevel.update(1 - memory.freeFraction)
-            text.append(value(memory.freeFraction, level: level))
+        if let disk {
+            let level = diskLevel.update(1 - disk.freeFraction)
+            text.append(coloured(gigabytes(disk.availableBytes), level: level))
         } else {
-            text.append(label("--%"))
+            text.append(label("--"))
         }
         text.append(label("  CPU "))
         if let cpu {
@@ -131,10 +133,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
 
     private func value(_ fraction: Double, level: Level) -> NSAttributedString {
-        NSAttributedString(string: percent(fraction), attributes: [
+        coloured(percent(fraction), level: level)
+    }
+
+    private func coloured(_ string: String, level: Level) -> NSAttributedString {
+        NSAttributedString(string: string, attributes: [
             .font: barFont,
             .foregroundColor: color(for: level),
         ])
+    }
+
+    /// Gigabytes en base decimal, como el Finder. Sin decimales a partir de 10 GB
+    /// para que el ancho en la barra no baile; por debajo sí, porque cuando quedan
+    /// pocos el decimal importa.
+    private func gigabytes(_ bytes: Int64) -> String {
+        let gb = Double(bytes) / 1_000_000_000
+        let format = gb >= 10 ? "%.0f GB" : "%.1f GB"
+        return String(format: format, locale: .current, gb)
     }
 
     private func percent(_ fraction: Double) -> String {
@@ -160,7 +175,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             menu.addItem(detail("Presión \(percent(memory.pressure).trimmingCharacters(in: .whitespaces)) · \(bytes(memory.usedBytes)) de \(bytes(memory.totalBytes)) en uso"))
             menu.addItem(detail("App \(bytes(memory.appBytes)) · Comprimida \(bytes(memory.compressedBytes)) · Wired \(bytes(memory.wiredBytes))"))
             menu.addItem(detail("Caché de archivos \(bytes(memory.cachedBytes)) · Swap \(bytes(memory.swapUsedBytes))"))
-            menu.addItem(detail("Libre \(percent(memory.freeFraction).trimmingCharacters(in: .whitespaces)) según el sistema"))
+            menu.addItem(detail("Memoria libre \(percent(memory.freeFraction).trimmingCharacters(in: .whitespaces)) según el sistema"))
+        }
+        if let disk {
+            menu.addItem(.separator())
+            menu.addItem(header("Almacenamiento"))
+            menu.addItem(detail("Libres \(gigabytes(disk.availableBytes)) de \(gigabytes(disk.totalBytes)) · \(percent(disk.freeFraction).trimmingCharacters(in: .whitespaces)) del volumen de arranque"))
         }
         if let cpu {
             menu.addItem(.separator())
