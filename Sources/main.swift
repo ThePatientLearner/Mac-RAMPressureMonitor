@@ -25,6 +25,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     // Umbrales del plan, con 3 puntos de histéresis.
     private var ramLevel = LevelTracker(warnAt: 0.60, critAt: 0.80, margin: 0.03)
     private var cpuLevel = LevelTracker(warnAt: 0.60, critAt: 0.85, margin: 0.03)
+    // Se alimenta con la fracción ocupada (1 - libre), así el verde es mucha
+    // memoria libre y el rojo poca, con los mismos umbrales que la presión.
+    private var freeLevel = LevelTracker(warnAt: 0.60, critAt: 0.80, margin: 0.03)
 
     private var memory: MemorySample?
     private var cpu: CPUSample?
@@ -45,6 +48,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         render()
         _ = cpuReader.read()  // línea base para el primer delta
         startTimer()
+        enableLaunchAtLoginOnFirstRun()
+    }
+
+    /// Queda registrada como item de inicio la primera vez que arranca, que es lo
+    /// que espera quien instala un monitor de barra: tras un reinicio debe seguir
+    /// ahí. Solo se hace una vez; si luego se desactiva desde el menú, esa
+    /// decisión se respeta y no se vuelve a registrar sola.
+    private func enableLaunchAtLoginOnFirstRun() {
+        let key = "didConfigureLoginItem"
+        let defaults = UserDefaults.standard
+        guard !defaults.bool(forKey: key) else { return }
+        defaults.set(true, forKey: key)
+
+        guard SMAppService.mainApp.status != .enabled else { return }
+        try? SMAppService.mainApp.register()
     }
 
     private func startTimer() {
@@ -76,6 +94,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         if let memory {
             let level = ramLevel.update(memory.pressure, floor: memory.kernelFloor)
             text.append(value(memory.pressure, level: level))
+        } else {
+            text.append(label("--%"))
+        }
+        text.append(label("  Libre "))
+        if let memory {
+            let level = freeLevel.update(1 - memory.freeFraction)
+            text.append(value(memory.freeFraction, level: level))
         } else {
             text.append(label("--%"))
         }
@@ -135,6 +160,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             menu.addItem(detail("Presión \(percent(memory.pressure).trimmingCharacters(in: .whitespaces)) · \(bytes(memory.usedBytes)) de \(bytes(memory.totalBytes)) en uso"))
             menu.addItem(detail("App \(bytes(memory.appBytes)) · Comprimida \(bytes(memory.compressedBytes)) · Wired \(bytes(memory.wiredBytes))"))
             menu.addItem(detail("Caché de archivos \(bytes(memory.cachedBytes)) · Swap \(bytes(memory.swapUsedBytes))"))
+            menu.addItem(detail("Libre \(percent(memory.freeFraction).trimmingCharacters(in: .whitespaces)) según el sistema"))
         }
         if let cpu {
             menu.addItem(.separator())

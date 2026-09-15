@@ -43,6 +43,7 @@ struct MemorySample {
     var cachedBytes: UInt64
     var totalBytes: UInt64
     var swapUsedBytes: UInt64
+    var freeFraction: Double  // 0...1, el mismo dato que reporta `memory_pressure`
     var kernelLevel: Int32    // 1 normal, 2 warn, 4 critical
 
     var kernelFloor: Level {
@@ -101,6 +102,7 @@ enum MemoryReader {
             cachedBytes: external + purgeable,
             totalBytes: total,
             swapUsedBytes: swapUsed(),
+            freeFraction: freeFraction(),
             kernelLevel: kernelPressureLevel())
     }
 
@@ -109,6 +111,16 @@ enum MemoryReader {
         var len = MemoryLayout<xsw_usage>.size
         guard sysctlbyname("vm.swapusage", &usage, &len, nil, 0) == 0 else { return 0 }
         return usage.xsu_used
+    }
+
+    /// macOS mantiene el porcentaje de memoria libre en un sysctl propio: es el
+    /// mismo valor que imprime `memory_pressure`, así que no hay que derivarlo.
+    private static func freeFraction() -> Double {
+        var value: Int32 = 0
+        var len = MemoryLayout<Int32>.size
+        guard sysctlbyname("kern.memorystatus_level", &value, &len, nil, 0) == 0
+        else { return 0 }
+        return min(max(Double(value) / 100.0, 0), 1)
     }
 
     private static func kernelPressureLevel() -> Int32 {

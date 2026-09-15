@@ -1,10 +1,10 @@
 # Mac-RAMPressureMonitor
 
-A tiny macOS menu bar app that shows **memory pressure** and **CPU usage** as live
-percentages, colour-coded green → orange → red.
+A tiny macOS menu bar app that shows **memory pressure**, **free memory** and **CPU
+usage** as live percentages, colour-coded green → orange → red.
 
 ```
-RAMp  41%  CPU  12%
+RAMp  39%  Libre  59%  CPU  8%
 ```
 
 No dependencies, no Xcode, no Dock icon. The whole thing is two Swift files and a
@@ -26,6 +26,11 @@ the same formula, and additionally reads `kern.memorystatus_vm_pressure_level` s
 can go orange or red the moment the kernel itself reports pressure, even if the
 percentage has not crossed the threshold yet.
 
+The **free** figure is read straight from `kern.memorystatus_level`, the same sysctl
+`memory_pressure` prints as "System-wide memory free percentage" — no derived formula,
+so it always agrees with what the system itself reports. Its colours run the other way:
+plenty of free memory is green, running out is red.
+
 CPU usage is the delta of kernel tick counters (`user + nice + system` over total)
 between samples — the same approach Activity Monitor takes.
 
@@ -35,10 +40,11 @@ roughly 0% CPU and ~45 MB of memory.
 
 ## Colour thresholds
 
-|         | Green  | Orange   | Red                     |
-| ------- | ------ | -------- | ----------------------- |
-| Memory  | < 60%  | 60–80%   | > 80%, or kernel warn   |
-| CPU     | < 60%  | 60–85%   | > 85%                   |
+|          | Green  | Orange   | Red                     |
+| -------- | ------ | -------- | ----------------------- |
+| Pressure | < 60%  | 60–80%   | > 80%, or kernel warn   |
+| Free     | > 40%  | 20–40%   | < 20%                   |
+| CPU      | < 60%  | 60–85%   | > 85%                   |
 
 Levels have 3 points of hysteresis, so the colour does not flicker when a value sits
 right on a threshold.
@@ -88,6 +94,12 @@ xattr -dr com.apple.quarantine /path/to/RAMPressureMonitor.app
 
 Both are one-time steps. The friction disappears entirely if the recipient clones this
 repository and runs `./build.sh` themselves.
+
+## Launch at login
+
+The app registers itself as a login item the first time it runs, so it survives
+reboots and system updates without any setup. It only does this once — if you turn it
+off from the menu, that choice sticks.
 
 ## Menu
 
