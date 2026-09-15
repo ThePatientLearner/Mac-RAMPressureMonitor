@@ -4,7 +4,7 @@ A tiny macOS menu bar app that shows **memory pressure**, **free disk space** an
 **CPU usage** live, colour-coded green → orange → red.
 
 ```
-RAMp  39%  Libre  102 GB  CPU  8%
+RAMp  39%  CPU  8%  Libre  102 GB
 ```
 
 No dependencies, no Xcode, no Dock icon. The whole thing is two Swift files and a

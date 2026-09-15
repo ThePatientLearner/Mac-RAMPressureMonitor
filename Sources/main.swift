@@ -99,19 +99,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         } else {
             text.append(label("--%"))
         }
-        text.append(label("  Libre "))
-        if let disk {
-            let level = diskLevel.update(1 - disk.freeFraction)
-            text.append(coloured(gigabytes(disk.availableBytes), level: level))
-        } else {
-            text.append(label("--"))
-        }
         text.append(label("  CPU "))
         if let cpu {
             let level = cpuLevel.update(cpu.total)
             text.append(value(cpu.total, level: level))
         } else {
             text.append(label("--%"))
+        }
+        text.append(label("  Libre "))
+        if let disk {
+            let level = diskLevel.update(1 - disk.freeFraction)
+            text.append(coloured(gigabytes(disk.availableBytes), level: level))
+        } else {
+            text.append(label("--"))
         }
 
         button.attributedTitle = text
