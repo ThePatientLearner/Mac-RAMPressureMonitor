@@ -1,10 +1,10 @@
 # Mac-RAMPressureMonitor
 
-A tiny macOS menu bar app that shows **memory pressure** and **CPU usage** as live
-percentages, colour-coded green → orange → red.
+A tiny macOS menu bar app that shows **memory pressure**, **free disk space** and
+**CPU usage** live, colour-coded green → orange → red.
 
 ```
-RAMp  41%  CPU  12%
+RAMp  39%  CPU  8%  Libre  102 GB
 ```
 
 No dependencies, no Xcode, no Dock icon. The whole thing is two Swift files and a
@@ -26,6 +26,12 @@ the same formula, and additionally reads `kern.memorystatus_vm_pressure_level` s
 can go orange or red the moment the kernel itself reports pressure, even if the
 percentage has not crossed the threshold yet.
 
+**Free disk space** is read with `volumeAvailableCapacityForImportantUsage`, the same
+figure Finder and *About This Mac* report. That is deliberately not what `df` prints:
+macOS counts purgeable space as available, so `df` will claim you have noticeably less
+room than the system will actually give you. Its colours run the other way round — lots
+of space is green, running out is red.
+
 CPU usage is the delta of kernel tick counters (`user + nice + system` over total)
 between samples — the same approach Activity Monitor takes.
 
@@ -35,10 +41,15 @@ roughly 0% CPU and ~45 MB of memory.
 
 ## Colour thresholds
 
-|         | Green  | Orange   | Red                     |
-| ------- | ------ | -------- | ----------------------- |
-| Memory  | < 60%  | 60–80%   | > 80%, or kernel warn   |
-| CPU     | < 60%  | 60–85%   | > 85%                   |
+|           | Green  | Orange   | Red                     |
+| --------- | ------ | -------- | ----------------------- |
+| Pressure  | < 60%  | 60–80%   | > 80%, or kernel warn   |
+| Disk free | > 20%  | 10–20%   | < 10%                   |
+| CPU       | < 60%  | 60–85%   | > 85%                   |
+
+Disk thresholds are a share of the volume's capacity, even though the figure shown is
+in gigabytes — 15 GB left means something very different on a 256 GB disk than on a 4 TB
+one.
 
 Levels have 3 points of hysteresis, so the colour does not flicker when a value sits
 right on a threshold.
@@ -88,6 +99,12 @@ xattr -dr com.apple.quarantine /path/to/RAMPressureMonitor.app
 
 Both are one-time steps. The friction disappears entirely if the recipient clones this
 repository and runs `./build.sh` themselves.
+
+## Launch at login
+
+The app registers itself as a login item the first time it runs, so it survives
+reboots and system updates without any setup. It only does this once — if you turn it
+off from the menu, that choice sticks.
 
 ## Menu
 

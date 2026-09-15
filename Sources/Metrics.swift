@@ -43,6 +43,7 @@ struct MemorySample {
     var cachedBytes: UInt64
     var totalBytes: UInt64
     var swapUsedBytes: UInt64
+    var freeFraction: Double  // 0...1, el mismo dato que reporta `memory_pressure`
     var kernelLevel: Int32    // 1 normal, 2 warn, 4 critical
 
     var kernelFloor: Level {
@@ -101,6 +102,7 @@ enum MemoryReader {
             cachedBytes: external + purgeable,
             totalBytes: total,
             swapUsedBytes: swapUsed(),
+            freeFraction: freeFraction(),
             kernelLevel: kernelPressureLevel())
     }
 
@@ -111,12 +113,52 @@ enum MemoryReader {
         return usage.xsu_used
     }
 
+    /// macOS mantiene el porcentaje de memoria libre en un sysctl propio: es el
+    /// mismo valor que imprime `memory_pressure`, así que no hay que derivarlo.
+    private static func freeFraction() -> Double {
+        var value: Int32 = 0
+        var len = MemoryLayout<Int32>.size
+        guard sysctlbyname("kern.memorystatus_level", &value, &len, nil, 0) == 0
+        else { return 0 }
+        return min(max(Double(value) / 100.0, 0), 1)
+    }
+
     private static func kernelPressureLevel() -> Int32 {
         var value: Int32 = 1
         var len = MemoryLayout<Int32>.size
         guard sysctlbyname("kern.memorystatus_vm_pressure_level", &value, &len, nil, 0) == 0
         else { return 1 }
         return value
+    }
+}
+
+// MARK: - Almacenamiento
+
+struct DiskSample {
+    var availableBytes: Int64
+    var totalBytes: Int64
+    var freeFraction: Double  // 0...1
+}
+
+enum DiskReader {
+    /// Lee el volumen de arranque. Se usa `forImportantUsage` porque es la cifra
+    /// que enseña el Finder: cuenta como disponible lo que macOS puede purgar,
+    /// así que coincide con lo que el usuario ve en "Acerca de este Mac".
+    static func read() -> DiskSample? {
+        let url = URL(fileURLWithPath: "/")
+        let keys: Set<URLResourceKey> = [
+            .volumeAvailableCapacityForImportantUsageKey,
+            .volumeTotalCapacityKey,
+        ]
+        guard let values = try? url.resourceValues(forKeys: keys),
+              let available = values.volumeAvailableCapacityForImportantUsage,
+              let total = values.volumeTotalCapacity, total > 0
+        else { return nil }
+
+        return DiskSample(
+            availableBytes: available,
+            totalBytes: Int64(total),
+            freeFraction: Double(available) / Double(total))
     }
 }
 
