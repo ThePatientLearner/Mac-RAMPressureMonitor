@@ -4,7 +4,7 @@ A tiny macOS menu bar app that shows **memory pressure** and **CPU usage** as li
 percentages, colour-coded green → orange → red.
 
 ```
-RAM  41%  CPU  12%
+RAMp  41%  CPU  12%
 ```
 
 No dependencies, no Xcode, no Dock icon. The whole thing is two Swift files and a

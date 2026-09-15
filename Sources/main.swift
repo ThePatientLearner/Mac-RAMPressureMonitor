@@ -72,7 +72,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         guard let button = statusItem.button else { return }
 
         let text = NSMutableAttributedString()
-        text.append(label("RAM "))
+        text.append(label("RAMp "))
         if let memory {
             let level = ramLevel.update(memory.pressure, floor: memory.kernelFloor)
             text.append(value(memory.pressure, level: level))
@@ -94,10 +94,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         .monospacedDigitSystemFont(ofSize: 11, weight: .regular)
     }
 
+    private var barLabelFont: NSFont {
+        .monospacedDigitSystemFont(ofSize: 11, weight: .medium)
+    }
+
     private func label(_ string: String) -> NSAttributedString {
         NSAttributedString(string: string, attributes: [
-            .font: barFont,
-            .foregroundColor: NSColor.secondaryLabelColor,
+            .font: barLabelFont,
+            .foregroundColor: NSColor.labelColor,
         ])
     }
 
