@@ -20,19 +20,33 @@ enum Prefs {
 final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private let statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
     private let cpuReader = CPUReader()
+    private let diskReader = DiskReader()
     private var timer: Timer?
 
     // Umbrales del plan, con 3 puntos de histéresis.
     private var ramLevel = LevelTracker(warnAt: 0.60, critAt: 0.80, margin: 0.03)
     private var cpuLevel = LevelTracker(warnAt: 0.60, critAt: 0.85, margin: 0.03)
+    // El disco se mide por lo lleno que está: el verde dura mucho más que en
+    // memoria o CPU, porque un SSD al 70 % no es ningún problema.
+    private var diskLevel = LevelTracker(warnAt: 0.85, critAt: 0.95, margin: 0.03)
 
     private var memory: MemorySample?
     private var cpu: CPUSample?
+    private var disk: DiskSample?
 
     private let byteFormatter: ByteCountFormatter = {
         let f = ByteCountFormatter()
         f.countStyle = .memory
         f.allowedUnits = [.useGB, .useMB]
+        return f
+    }()
+
+    /// El disco se cuenta en unidades decimales, que es como lo hacen el Finder
+    /// y Ajustes del Sistema. La memoria, arriba, sigue siendo binaria.
+    private let diskFormatter: ByteCountFormatter = {
+        let f = ByteCountFormatter()
+        f.countStyle = .file
+        f.allowedUnits = [.useGB, .useTB]
         return f
     }()
 
@@ -60,9 +74,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { [weak self] in self?.tick() }
     }
 
-    private func tick() {
+    private func tick(forceDisk: Bool = false) {
         memory = MemoryReader.read()
         if let sample = cpuReader.read() { cpu = sample }
+        disk = diskReader.read(force: forceDisk)
         render()
     }
 
@@ -86,6 +101,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         } else {
             text.append(label("--%"))
         }
+        text.append(label("  SSD "))
+        if let disk {
+            let level = diskLevel.update(disk.usedFraction)
+            text.append(value(compact(disk.freeBytes), level: level))
+        } else {
+            text.append(label("-- GB"))
+        }
 
         button.attributedTitle = text
     }
@@ -106,7 +128,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
 
     private func value(_ fraction: Double, level: Level) -> NSAttributedString {
-        NSAttributedString(string: percent(fraction), attributes: [
+        value(percent(fraction), level: level)
+    }
+
+    private func value(_ string: String, level: Level) -> NSAttributedString {
+        NSAttributedString(string: string, attributes: [
             .font: barFont,
             .foregroundColor: color(for: level),
         ])
@@ -114,6 +140,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     private func percent(_ fraction: Double) -> String {
         String(format: "%3d%%", Int((fraction * 100).rounded()))
+    }
+
+    /// Versión corta para la barra de menús, donde el sitio es escaso:
+    /// "622 GB", "82 GB", "1,4 TB".
+    private func compact(_ value: UInt64) -> String {
+        let gb = Double(value) / 1_000_000_000
+        if gb >= 1000 {
+            return String(format: "%.1f TB", locale: .current, gb / 1000)
+        }
+        return String(format: "%.0f GB", gb)
     }
 
     private func color(for level: Level) -> NSColor {
@@ -127,7 +163,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     // MARK: - Menú
 
     func menuWillOpen(_ menu: NSMenu) {
-        tick()
+        // Al abrir el menú se fuerza la lectura cara del espacio purgable, que
+        // el resto del tiempo va cacheada.
+        tick(forceDisk: true)
         menu.removeAllItems()
 
         if let memory {
@@ -140,6 +178,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             menu.addItem(.separator())
             menu.addItem(header("Procesador"))
             menu.addItem(detail("Uso \(percent(cpu.total).trimmingCharacters(in: .whitespaces)) · Usuario \(percent(cpu.user).trimmingCharacters(in: .whitespaces)) · Sistema \(percent(cpu.system).trimmingCharacters(in: .whitespaces))"))
+        }
+        if let disk {
+            menu.addItem(.separator())
+            menu.addItem(header("Disco"))
+            menu.addItem(detail("Libre \(diskBytes(disk.freeBytes)) de \(diskBytes(disk.totalBytes)) · \(percent(disk.usedFraction).trimmingCharacters(in: .whitespaces)) ocupado"))
+            if disk.purgeableBytes > 0 {
+                menu.addItem(detail("Purgable \(diskBytes(disk.purgeableBytes)) · caché que el sistema soltaría si hace falta"))
+            }
         }
 
         menu.addItem(.separator())
@@ -199,6 +245,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     private func bytes(_ value: UInt64) -> String {
         byteFormatter.string(fromByteCount: Int64(value))
+    }
+
+    private func diskBytes(_ value: UInt64) -> String {
+        diskFormatter.string(fromByteCount: Int64(value))
     }
 
     // MARK: - Acciones
