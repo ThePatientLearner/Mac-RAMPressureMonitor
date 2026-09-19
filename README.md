@@ -1,10 +1,10 @@
 # Mac-RAMPressureMonitor
 
-A tiny macOS menu bar app that shows **memory pressure** and **CPU usage** as live
-percentages, colour-coded green → orange → red.
+A tiny macOS menu bar app that shows **memory pressure**, **CPU usage** and **free
+SSD space**, colour-coded green → orange → red.
 
 ```
-RAMp  41%  CPU  12%
+RAMp  41%  CPU  12%  SSD  622 GB
 ```
 
 No dependencies, no Xcode, no Dock icon. The whole thing is two Swift files and a
@@ -26,6 +26,18 @@ the same formula, and additionally reads `kern.memorystatus_vm_pressure_level` s
 can go orange or red the moment the kernel itself reports pressure, even if the
 percentage has not crossed the threshold yet.
 
+Free disk space comes from `statfs`, which on `/` reports the whole **APFS container**
+— System, Preboot, Recovery, Data, VM and any local snapshots — not just the mounted
+volume. It matches `Capacity Not Allocated` in `diskutil apfs list` and the `Avail`
+column of `df`. APFS keeps no root reserve, so `f_bavail` and `f_bfree` are the same
+number.
+
+What it deliberately does *not* count is **purgeable** space: caches macOS would throw
+away if you ran out of room. That is not free space, so it stays out of the headline
+figure and is shown separately in the menu. Reading it costs about 20 ms against the
+0.001 ms of `statfs`, so it is refreshed at most every 30 seconds, while the free-space
+figure itself is live on every tick.
+
 CPU usage is the delta of kernel tick counters (`user + nice + system` over total)
 between samples — the same approach Activity Monitor takes.
 
@@ -39,6 +51,10 @@ roughly 0% CPU and ~45 MB of memory.
 | ------- | ------ | -------- | ----------------------- |
 | Memory  | < 60%  | 60–80%   | > 80%, or kernel warn   |
 | CPU     | < 60%  | 60–85%   | > 85%                   |
+| Disk    | < 85%  | 85–95%   | > 95% full              |
+
+The disk colour tracks how *full* the drive is, so green lasts much longer than it does
+for memory or CPU — an SSD at 70% is not a problem.
 
 Levels have 3 points of hysteresis, so the colour does not flicker when a value sits
 right on a threshold.
@@ -92,13 +108,16 @@ repository and runs `./build.sh` themselves.
 ## Menu
 
 Click the menu bar item for a breakdown — app / compressed / wired memory, file cache,
-swap, and CPU split between user and system. From the same menu you can set the
+swap, CPU split between user and system, and disk free / total with the purgeable
+space listed separately. From the same menu you can set the
 refresh interval (1s / 2s / 5s), toggle launch at login, or open Activity Monitor.
 
 ## Customising
 
-- **Thresholds** — `ramLevel` / `cpuLevel` at the top of `Sources/main.swift`
+- **Thresholds** — `ramLevel` / `cpuLevel` / `diskLevel` at the top of `Sources/main.swift`
 - **Menu bar format** — the `render()` function in `Sources/main.swift`
+- **Purgeable refresh rate** — `purgeableInterval` on `DiskReader` in `Sources/Metrics.swift`
+- **Which volume** — `DiskReader(path:)`, `/` by default
 - **Metrics** — `Sources/Metrics.swift`
 
 ## Note on language

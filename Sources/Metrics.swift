@@ -165,3 +165,79 @@ final class CPUReader {
         return result == KERN_SUCCESS ? info : nil
     }
 }
+
+// MARK: - Disco
+
+struct DiskSample {
+    var freeBytes: UInt64      // libre de verdad: lo que cuentan `df` y el Finder
+    var totalBytes: UInt64
+    var usedBytes: UInt64
+    var purgeableBytes: UInt64 // caché que el sistema soltaría, no es espacio libre
+
+    var usedFraction: Double {
+        totalBytes > 0 ? Double(usedBytes) / Double(totalBytes) : 0
+    }
+}
+
+/// Lee el volumen de arranque.
+///
+/// La cifra base sale de `statfs`, que sobre `/` informa del contenedor APFS
+/// entero — System, Preboot, Recovery, Data, VM y los snapshots locales, si los
+/// hay — y no sólo del volumen montado. Coincide con "Capacity Not Allocated"
+/// de `diskutil apfs list`. En APFS no hay reserva para root, así que `f_bavail`
+/// y `f_bfree` son el mismo número.
+///
+/// Aparte está el espacio *purgable*: caché que macOS tiraría si hiciera falta.
+/// No es espacio libre, así que no entra en la cifra principal, pero se enseña
+/// en el menú. Obtenerlo cuesta unos 20 ms frente a los 0,001 ms de `statfs`,
+/// de modo que se refresca como mucho cada `purgeableInterval`.
+final class DiskReader {
+    private let path: String
+    private let purgeableInterval: TimeInterval
+    private var purgeable: UInt64 = 0
+    private var lastPurgeableRead: Date?
+
+    init(path: String = "/", purgeableInterval: TimeInterval = 30) {
+        self.path = path
+        self.purgeableInterval = purgeableInterval
+    }
+
+    func read(force: Bool = false) -> DiskSample? {
+        guard var sample = measure() else { return nil }
+        refreshPurgeable(freeBytes: sample.freeBytes, force: force)
+        sample.purgeableBytes = purgeable
+        return sample
+    }
+
+    private func measure() -> DiskSample? {
+        var fs = statfs()
+        guard statfs(path, &fs) == 0, fs.f_blocks > 0 else { return nil }
+
+        let block = UInt64(fs.f_bsize)
+        let total = UInt64(fs.f_blocks) * block
+        let free = min(UInt64(fs.f_bavail) * block, total)
+
+        return DiskSample(
+            freeBytes: free,
+            totalBytes: total,
+            usedBytes: total - free,
+            purgeableBytes: 0)
+    }
+
+    private func refreshPurgeable(freeBytes: UInt64, force: Bool) {
+        if !force, let last = lastPurgeableRead,
+           Date().timeIntervalSince(last) < purgeableInterval { return }
+
+        // Instancia nueva a propósito: NSURL cachea los valores de recurso, así
+        // que reutilizar la misma URL devolvería siempre la primera lectura.
+        let url = URL(fileURLWithPath: path)
+        guard let values = try? url.resourceValues(
+                forKeys: [.volumeAvailableCapacityForImportantUsageKey]),
+              let important = values.volumeAvailableCapacityForImportantUsage
+        else { return }
+
+        let withPurgeable = UInt64(max(0, important))
+        purgeable = withPurgeable > freeBytes ? withPurgeable - freeBytes : 0
+        lastPurgeableRead = Date()
+    }
+}
