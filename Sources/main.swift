@@ -121,8 +121,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         }
         text.append(label("  SSD "))
         if let disk {
-            let level = Self.diskLevel(freeBytes: disk.freeBytes)
-            text.append(value(compact(disk.freeBytes), level: level))
+            let level = Self.diskLevel(freeBytes: disk.availableBytes)
+            text.append(value(compact(disk.availableBytes), level: level))
         } else {
             text.append(label("-- GB"))
         }
@@ -206,9 +206,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         if let disk {
             menu.addItem(.separator())
             menu.addItem(header("Disco"))
-            menu.addItem(detail("Libre \(diskBytes(disk.freeBytes)) de \(diskBytes(disk.totalBytes)) · \(percent(disk.usedFraction).trimmingCharacters(in: .whitespaces)) ocupado"))
+            menu.addItem(detail("Disponible \(diskBytes(disk.availableBytes)) de \(diskBytes(disk.totalBytes)) · \(percent(disk.usedFraction).trimmingCharacters(in: .whitespaces)) ocupado"))
             if disk.purgeableBytes > 0 {
-                menu.addItem(detail("Purgable \(diskBytes(disk.purgeableBytes)) · caché que el sistema soltaría si hace falta"))
+                menu.addItem(detail("Libres ahora \(diskBytes(disk.freeBytes)) + \(diskBytes(disk.purgeableBytes)) purgables que el sistema soltaría"))
             }
         }
 

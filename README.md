@@ -32,11 +32,16 @@ volume. It matches `Capacity Not Allocated` in `diskutil apfs list` and the `Ava
 column of `df`. APFS keeps no root reserve, so `f_bavail` and `f_bfree` are the same
 number.
 
-What it deliberately does *not* count is **purgeable** space: caches macOS would throw
-away if you ran out of room. That is not free space, so it stays out of the headline
-figure and is shown separately in the menu. Reading it costs about 20 ms against the
-0.001 ms of `statfs`, so it is refreshed at most every 30 seconds, while the free-space
-figure itself is live on every tick.
+On top of that sits **purgeable** space — caches macOS would throw away if you ran out
+of room. Strictly speaking it is not free, but macOS counts it as available and hands it
+over the moment you need it, which is why Finder and *System Settings → Storage* include
+it. The headline figure therefore includes it too: a monitor that contradicts the
+system's own number by tens of gigabytes is worse than useless, because you cannot tell
+which one to believe. On a 245 GB disk the two readings can differ by more than 30 GB.
+
+The menu breaks it apart: how much is free right now, and how much is purgeable on top.
+Reading the purgeable figure costs about 20 ms against the 0.001 ms of `statfs`, so it is
+refreshed at most every 30 seconds, and always when you open the menu.
 
 CPU usage is the delta of kernel tick counters (`user + nice + system` over total)
 between samples — the same approach Activity Monitor takes.
@@ -117,7 +122,7 @@ the menu, that choice sticks.
 ## Menu
 
 Click the menu bar item for a breakdown — app / compressed / wired memory, file cache,
-swap, CPU split between user and system, and disk free / total with the purgeable
+swap, CPU split between user and system, and disk available / total with the purgeable
 space listed separately. From the same menu you can set the
 refresh interval (1s / 2s / 5s), toggle launch at login, or open Activity Monitor.
 

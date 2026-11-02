@@ -169,13 +169,22 @@ final class CPUReader {
 // MARK: - Disco
 
 struct DiskSample {
-    var freeBytes: UInt64      // libre de verdad: lo que cuentan `df` y el Finder
+    var freeBytes: UInt64      // bloques libres ahora mismo: lo que cuenta `df`
     var totalBytes: UInt64
     var usedBytes: UInt64
-    var purgeableBytes: UInt64 // caché que el sistema soltaría, no es espacio libre
+    var purgeableBytes: UInt64 // caché que el sistema soltaría si hiciera falta
 
+    /// Lo que macOS considera disponible, purgable incluido. Es la cifra que
+    /// enseñan el Finder y Ajustes → Almacenamiento, y por tanto con la que el
+    /// usuario va a comparar lo que ve en la barra.
+    var availableBytes: UInt64 { freeBytes + purgeableBytes }
+
+    /// Ocupado frente a lo disponible, para que el porcentaje del menú cuadre
+    /// con la cifra principal en lugar de contradecirla.
     var usedFraction: Double {
-        totalBytes > 0 ? Double(usedBytes) / Double(totalBytes) : 0
+        guard totalBytes > 0 else { return 0 }
+        let used = totalBytes > availableBytes ? totalBytes - availableBytes : 0
+        return Double(used) / Double(totalBytes)
     }
 }
 
