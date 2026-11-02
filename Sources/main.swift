@@ -26,9 +26,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     // Umbrales del plan, con 3 puntos de histéresis.
     private var ramLevel = LevelTracker(warnAt: 0.60, critAt: 0.80, margin: 0.03)
     private var cpuLevel = LevelTracker(warnAt: 0.60, critAt: 0.85, margin: 0.03)
-    // El disco se mide por lo lleno que está: el verde dura mucho más que en
-    // memoria o CPU, porque un SSD al 70 % no es ningún problema.
-    private var diskLevel = LevelTracker(warnAt: 0.85, critAt: 0.95, margin: 0.03)
+    // El disco se mide en GB libres, no en porcentaje: lo que duele es quedarse
+    // sin sitio para una actualización o un archivo grande, y eso ocurre a una
+    // cifra absoluta parecida tenga el disco el tamaño que tenga. Sin histéresis
+    // porque el espacio libre no oscila de un segundo a otro como la CPU.
+    private static let diskWarnBytes: UInt64 = 60_000_000_000
+    private static let diskCriticalBytes: UInt64 = 40_000_000_000
 
     private var memory: MemorySample?
     private var cpu: CPUSample?
@@ -59,6 +62,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         render()
         _ = cpuReader.read()  // línea base para el primer delta
         startTimer()
+        enableLaunchAtLoginOnFirstRun()
+    }
+
+    /// Queda registrada como item de inicio la primera vez que arranca, que es lo
+    /// que espera quien instala un monitor de barra: tras un reinicio o una
+    /// actualización del sistema debe seguir ahí. Solo se hace una vez; si luego
+    /// se desactiva desde el menú, esa decisión se respeta.
+    private func enableLaunchAtLoginOnFirstRun() {
+        let key = "didConfigureLoginItem"
+        let defaults = UserDefaults.standard
+        guard !defaults.bool(forKey: key) else { return }
+        defaults.set(true, forKey: key)
+
+        guard SMAppService.mainApp.status != .enabled else { return }
+        try? SMAppService.mainApp.register()
     }
 
     private func startTimer() {
@@ -103,7 +121,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         }
         text.append(label("  SSD "))
         if let disk {
-            let level = diskLevel.update(disk.usedFraction)
+            let level = Self.diskLevel(freeBytes: disk.freeBytes)
             text.append(value(compact(disk.freeBytes), level: level))
         } else {
             text.append(label("-- GB"))
@@ -150,6 +168,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             return String(format: "%.1f TB", locale: .current, gb / 1000)
         }
         return String(format: "%.0f GB", gb)
+    }
+
+    private static func diskLevel(freeBytes: UInt64) -> Level {
+        if freeBytes < diskCriticalBytes { return .critical }
+        if freeBytes < diskWarnBytes { return .warn }
+        return .ok
     }
 
     private func color(for level: Level) -> NSColor {

@@ -47,17 +47,20 @@ roughly 0% CPU and ~45 MB of memory.
 
 ## Colour thresholds
 
-|         | Green  | Orange   | Red                     |
-| ------- | ------ | -------- | ----------------------- |
-| Memory  | < 60%  | 60–80%   | > 80%, or kernel warn   |
-| CPU     | < 60%  | 60–85%   | > 85%                   |
-| Disk    | < 85%  | 85–95%   | > 95% full              |
+|         | Green    | Orange     | Red       |
+| ------- | -------- | ---------- | --------- |
+| Memory  | < 60%    | 60–80%     | > 80%, or kernel warn |
+| CPU     | < 60%    | 60–85%     | > 85%     |
+| Disk    | ≥ 60 GB  | 40–60 GB   | < 40 GB free |
 
-The disk colour tracks how *full* the drive is, so green lasts much longer than it does
-for memory or CPU — an SSD at 70% is not a problem.
+The disk is judged on gigabytes left rather than percentage full. What actually hurts is
+having no room for a system update or a large file, and that happens at roughly the same
+absolute figure whatever the size of the drive — 5% free is comfortable on a 4 TB disk
+and fatal on a 256 GB one.
 
-Levels have 3 points of hysteresis, so the colour does not flicker when a value sits
-right on a threshold.
+Memory and CPU levels have 3 points of hysteresis, so their colour does not flicker when
+a value sits right on a threshold. The disk needs none: free space does not oscillate
+from one second to the next.
 
 ## Requirements
 
@@ -104,6 +107,12 @@ xattr -dr com.apple.quarantine /path/to/RAMPressureMonitor.app
 
 Both are one-time steps. The friction disappears entirely if the recipient clones this
 repository and runs `./build.sh` themselves.
+
+## Launch at login
+
+The app registers itself as a login item the first time it runs, so it survives reboots
+and system updates without any setup. It only does this once — if you turn it off from
+the menu, that choice sticks.
 
 ## Menu
 
